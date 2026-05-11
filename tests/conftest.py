@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.tradepulse.api.insider import InsiderClient
 from custom_components.tradepulse.api.news import NewsClient
 from custom_components.tradepulse.api.price import PriceClient
+from custom_components.tradepulse.const import DOMAIN
 from custom_components.tradepulse.models import (
     InsiderData,
     InsiderTransaction,
@@ -18,45 +20,44 @@ from custom_components.tradepulse.models import (
 
 _NOW = datetime(2026, 5, 11, 12, 0, 0, tzinfo=timezone.utc)
 
+_TSLA_META = {
+    "asset_type": "stock",
+    "exchange": "NMS",
+    "currency": "USD",
+    "name": "Tesla, Inc.",
+}
 
-@pytest.fixture
-def mock_hass():
-    hass = MagicMock()
-    hass.loop = MagicMock()
-    return hass
-
-
-@pytest.fixture
-def mock_config_entry():
-    entry = MagicMock()
-    entry.data = {
-        "symbols": {
-            "TSLA": {
-                "asset_type": "stock",
-                "exchange": "NMS",
-                "currency": "USD",
-                "name": "Tesla, Inc.",
-            },
-            "BTC-USD": {
-                "asset_type": "crypto",
-                "exchange": "CCC",
-                "currency": "USD",
-                "name": "Bitcoin",
-            },
-        }
-    }
-    entry.options = {}
-    entry.entry_id = "test_entry_id"
-    return entry
+_BTC_META = {
+    "asset_type": "crypto",
+    "exchange": "CCC",
+    "currency": "USD",
+    "name": "Bitcoin",
+}
 
 
 @pytest.fixture
-def mock_aiohttp_session():
+def mock_config_entry() -> MockConfigEntry:
+    return MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "symbols": {
+                "TSLA": _TSLA_META,
+                "BTC-USD": _BTC_META,
+            }
+        },
+        options={},
+        entry_id="test_entry_id",
+        unique_id="tradepulse_main",
+    )
+
+
+@pytest.fixture
+def mock_aiohttp_session() -> AsyncMock:
     return AsyncMock()
 
 
 @pytest.fixture
-def mock_price_client():
+def mock_price_client() -> AsyncMock:
     client = AsyncMock(spec=PriceClient)
     client.get_price.return_value = PriceData(
         ticker="TSLA",
@@ -67,17 +68,12 @@ def mock_price_client():
         name="Tesla, Inc.",
         last_updated=_NOW,
     )
-    client.validate_symbol.return_value = {
-        "asset_type": "stock",
-        "exchange": "NMS",
-        "currency": "USD",
-        "name": "Tesla, Inc.",
-    }
+    client.validate_symbol.return_value = _TSLA_META
     return client
 
 
 @pytest.fixture
-def mock_news_client():
+def mock_news_client() -> AsyncMock:
     client = AsyncMock(spec=NewsClient)
     client.get_news.return_value = NewsData(
         ticker="TSLA",
@@ -96,7 +92,7 @@ def mock_news_client():
 
 
 @pytest.fixture
-def mock_insider_client():
+def mock_insider_client() -> AsyncMock:
     client = AsyncMock(spec=InsiderClient)
     client.get_insider.return_value = InsiderData(
         ticker="TSLA",
