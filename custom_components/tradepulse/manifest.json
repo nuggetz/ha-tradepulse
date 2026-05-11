@@ -1,12 +1,12 @@
 {
   "domain": "tradepulse",
   "name": "TradePulse",
-  "version": "0.1.0",
+  "codeowners": ["@nuggetz"],
   "config_flow": true,
+  "dependencies": [],
   "documentation": "https://github.com/nuggetz/ha-tradepulse",
+  "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/nuggetz/ha-tradepulse/issues",
   "requirements": ["yfinance>=0.2.40"],
-  "dependencies": [],
-  "codeowners": ["@nuggetz"],
-  "iot_class": "cloud_polling"
+  "version": "0.1.0"
 }

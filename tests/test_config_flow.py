@@ -108,7 +108,10 @@ async def test_options_flow_api_key_valid():
 
     with patch(
         "custom_components.tradepulse.config_flow.InsiderClient"
-    ) as MockClient:
+    ) as MockClient, patch(
+        "custom_components.tradepulse.config_flow.async_get_clientsession",
+        return_value=AsyncMock(),
+    ):
         instance = MockClient.return_value
         instance.validate_finnhub_key = AsyncMock(return_value=True)
         result = await flow.async_step_api_keys({"finnhub_api_key": "valid_key_123"})
@@ -130,7 +133,10 @@ async def test_options_flow_api_key_invalid():
 
     with patch(
         "custom_components.tradepulse.config_flow.InsiderClient"
-    ) as MockClient:
+    ) as MockClient, patch(
+        "custom_components.tradepulse.config_flow.async_get_clientsession",
+        return_value=AsyncMock(),
+    ):
         instance = MockClient.return_value
         instance.validate_finnhub_key = AsyncMock(return_value=False)
         result = await flow.async_step_api_keys({"finnhub_api_key": "bad_key"})
