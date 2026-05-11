@@ -37,6 +37,8 @@ No API key is required for full US market coverage. A free [Finnhub](https://fin
 6. Go to **Settings → Devices & Services → Add Integration**
 7. Search for **TradePulse** and follow the setup wizard
 
+![Setup step 1 — enter ticker symbols](docs/imgs/setup_step1.png)
+
 > **Tip:** After setup, click **Configure** on the integration card to add/remove tickers, adjust update intervals, or add a Finnhub key — no restart needed.
 
 ### Manual
@@ -52,6 +54,8 @@ No API key is required for full US market coverage. A free [Finnhub](https://fin
 ## Entities
 
 Each tracked ticker creates a HA **device** (named after the asset) with up to three sensors. Entity IDs follow the pattern `sensor.{asset_name}_{type}` — check **Settings → Devices** to see the exact IDs in your instance. The `unique_id` used internally follows `tradepulse_{normalized_ticker}_{type}`.
+
+![Sensors on device page](docs/imgs/sensors.png)
 
 ### Price sensor
 
@@ -95,6 +99,8 @@ Each article object:
 }
 ```
 
+![News attributes in Developer Tools](docs/imgs/news_attributes.png)
+
 ### Insider sensor
 
 **State:** number of insider transactions in the last 90 days (`int`). Only created for stocks — not for ETF, forex, or crypto.
@@ -120,6 +126,8 @@ Each transaction object:
   "date": "2026-04-15T00:00:00+00:00"
 }
 ```
+
+![Insider attributes in Developer Tools](docs/imgs/atributes.png)
 
 > **EU/UK tickers:** insider data requires a Finnhub API key. Without it, the sensor is created but always shows `0` transactions (state=`0`), so automations that watch this sensor will not break.
 
@@ -165,6 +173,8 @@ Supported formats:
 
 Access via **Settings → Devices & Services → TradePulse → Configure**.
 
+![Options menu](docs/imgs/setup_options_menu.png)
+
 #### Manage symbols
 
 | Field | Description |
@@ -173,6 +183,8 @@ Access via **Settings → Devices & Services → TradePulse → Configure**.
 | Remove symbols | Multi-select of currently tracked tickers to remove |
 
 Changes take effect immediately after saving (integration reloads automatically).
+
+![Manage symbols](docs/imgs/manage_symbols.png)
 
 #### Advanced options
 
@@ -183,6 +195,8 @@ Changes take effect immediately after saving (integration reloads automatically)
 | News update interval | `30` min | 15–120 min | How often news is refreshed |
 | News language | `en` | en/it/de/fr/es | Language used for Google News queries |
 
+![Advanced options](docs/imgs/advanced_options.png)
+
 #### API keys
 
 | Field | Required | Description |
@@ -190,6 +204,8 @@ Changes take effect immediately after saving (integration reloads automatically)
 | Finnhub API key | No | Enables EU/UK insider data (PDMR) and Finnhub news. Get a free key at [finnhub.io](https://finnhub.io) |
 
 The key is validated before saving. If validation fails, the key is rejected and the field is shown empty — other options on the same page are not affected.
+
+![API keys](docs/imgs/api_keys.png)
 
 ---
 

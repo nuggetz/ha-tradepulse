@@ -1,0 +1,188 @@
+<svg width="1280" height="320" viewBox="0 0 1280 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgH" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#080f1a" />
+      <stop offset="60%" style="stop-color:#0a1e35" />
+      <stop offset="100%" style="stop-color:#071520" />
+    </linearGradient>
+    <linearGradient id="glowLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00e5a0;stop-opacity:0" />
+      <stop offset="20%" style="stop-color:#00e5a0;stop-opacity:0.9" />
+      <stop offset="75%" style="stop-color:#00cfff;stop-opacity:0.7" />
+      <stop offset="100%" style="stop-color:#00cfff;stop-opacity:0" />
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ffffff" />
+      <stop offset="60%" style="stop-color:#e0f7f0" />
+      <stop offset="100%" style="stop-color:#00e5a0" />
+    </linearGradient>
+    <linearGradient id="candleUp" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00e5a0" />
+      <stop offset="100%" style="stop-color:#007a54" />
+    </linearGradient>
+    <filter id="glowF">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bigGlow">
+      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="textGlow">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="320" fill="url(#bgH)"/>
+
+  <!-- Subtle horizontal grid -->
+  <g opacity="0.04" stroke="#00e5a0" stroke-width="1">
+    <line x1="0" y1="80" x2="1280" y2="80"/>
+    <line x1="0" y1="160" x2="1280" y2="160"/>
+    <line x1="0" y1="240" x2="1280" y2="240"/>
+  </g>
+  <!-- Vertical grid sparse -->
+  <g opacity="0.03" stroke="#00e5a0" stroke-width="1">
+    <line x1="160" y1="0" x2="160" y2="320"/>
+    <line x1="320" y1="0" x2="320" y2="320"/>
+    <line x1="480" y1="0" x2="480" y2="320"/>
+    <line x1="640" y1="0" x2="640" y2="320"/>
+    <line x1="800" y1="0" x2="800" y2="320"/>
+    <line x1="960" y1="0" x2="960" y2="320"/>
+    <line x1="1120" y1="0" x2="1120" y2="320"/>
+  </g>
+
+  <!-- Right side candlestick chart decoration -->
+  <!-- Candle set starting at x=820 -->
+  <g opacity="0.55">
+    <!-- c1 bear -->
+    <line x1="850" y1="95" x2="850" y2="165" stroke="#ff4d6d" stroke-width="1.5"/>
+    <rect x="843" y="108" width="14" height="42" rx="2" fill="#ff4d6d"/>
+    <line x1="850" y1="150" x2="850" y2="180" stroke="#ff4d6d" stroke-width="1.5"/>
+    <!-- c2 bull -->
+    <line x1="884" y1="80" x2="884" y2="130" stroke="#00e5a0" stroke-width="1.5" filter="url(#glowF)"/>
+    <rect x="877" y="88" width="14" height="55" rx="2" fill="url(#candleUp)" filter="url(#glowF)"/>
+    <line x1="884" y1="143" x2="884" y2="175" stroke="#00e5a0" stroke-width="1.5" filter="url(#glowF)"/>
+    <!-- c3 bear small -->
+    <line x1="918" y1="88" x2="918" y2="128" stroke="#ff4d6d" stroke-width="1.5"/>
+    <rect x="911" y="96" width="14" height="28" rx="2" fill="#ff4d6d"/>
+    <line x1="918" y1="124" x2="918" y2="160" stroke="#ff4d6d" stroke-width="1.5"/>
+    <!-- c4 bull large -->
+    <line x1="952" y1="65" x2="952" y2="108" stroke="#00e5a0" stroke-width="2" filter="url(#glowF)"/>
+    <rect x="945" y="75" width="14" height="68" rx="2" fill="url(#candleUp)" filter="url(#glowF)"/>
+    <line x1="952" y1="143" x2="952" y2="175" stroke="#00e5a0" stroke-width="2" filter="url(#glowF)"/>
+    <!-- c5 bull -->
+    <line x1="986" y1="72" x2="986" y2="105" stroke="#00e5a0" stroke-width="1.5" filter="url(#glowF)"/>
+    <rect x="979" y="80" width="14" height="48" rx="2" fill="url(#candleUp)" filter="url(#glowF)"/>
+    <line x1="986" y1="128" x2="986" y2="158" stroke="#00e5a0" stroke-width="1.5" filter="url(#glowF)"/>
+    <!-- c6 bear -->
+    <line x1="1020" y1="78" x2="1020" y2="118" stroke="#ff4d6d" stroke-width="1.5"/>
+    <rect x="1013" y="86" width="14" height="30" rx="2" fill="#ff4d6d"/>
+    <line x1="1020" y1="116" x2="1020" y2="152" stroke="#ff4d6d" stroke-width="1.5"/>
+    <!-- c7 bull big -->
+    <line x1="1054" y1="58" x2="1054" y2="92" stroke="#00e5a0" stroke-width="2" filter="url(#glowF)"/>
+    <rect x="1047" y="66" width="14" height="72" rx="2" fill="url(#candleUp)" filter="url(#glowF)"/>
+    <line x1="1054" y1="138" x2="1054" y2="168" stroke="#00e5a0" stroke-width="2" filter="url(#glowF)"/>
+    <!-- c8 bull -->
+    <line x1="1088" y1="62" x2="1088" y2="92" stroke="#00e5a0" stroke-width="1.5" filter="url(#glowF)"/>
+    <rect x="1081" y="70" width="14" height="52" rx="2" fill="url(#candleUp)" filter="url(#glowF)"/>
+    <line x1="1088" y1="122" x2="1088" y2="150" stroke="#00e5a0" stroke-width="1.5" filter="url(#glowF)"/>
+    <!-- c9 bear -->
+    <line x1="1122" y1="70" x2="1122" y2="105" stroke="#ff4d6d" stroke-width="1.5"/>
+    <rect x="1115" y="78" width="14" height="24" rx="2" fill="#ff4d6d"/>
+    <line x1="1122" y1="102" x2="1122" y2="138" stroke="#ff4d6d" stroke-width="1.5"/>
+    <!-- c10 bull -->
+    <line x1="1156" y1="55" x2="1156" y2="82" stroke="#00e5a0" stroke-width="2" filter="url(#glowF)"/>
+    <rect x="1149" y="62" width="14" height="60" rx="2" fill="url(#candleUp)" filter="url(#glowF)"/>
+    <line x1="1156" y1="122" x2="1156" y2="148" stroke="#00e5a0" stroke-width="2" filter="url(#glowF)"/>
+    <!-- c11 bull big final -->
+    <line x1="1190" y1="45" x2="1190" y2="75" stroke="#00e5a0" stroke-width="2" filter="url(#bigGlow)"/>
+    <rect x="1183" y="52" width="14" height="80" rx="2" fill="url(#candleUp)" filter="url(#bigGlow)"/>
+    <line x1="1190" y1="132" x2="1190" y2="162" stroke="#00e5a0" stroke-width="2" filter="url(#bigGlow)"/>
+    <!-- c12 doji -->
+    <line x1="1224" y1="60" x2="1224" y2="155" stroke="#00e5a0" stroke-width="1.5" filter="url(#glowF)"/>
+    <rect x="1217" y="90" width="14" height="8" rx="1" fill="#00e5a0" filter="url(#glowF)"/>
+  </g>
+
+  <!-- ECG pulse line full width -->
+  <polyline
+    points="0,220 80,220 110,220 130,185 152,255 172,165 192,265 212,220 380,220 410,200 430,240 450,210 470,230 490,220 1280,220"
+    fill="none"
+    stroke="url(#glowLine)"
+    stroke-width="2.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#glowF)"
+  />
+
+  <!-- Logo icon left -->
+  <!-- Mini rounded square background for logo -->
+  <rect x="52" y="88" width="100" height="100" rx="18" fill="#0d1f33" stroke="#00e5a0" stroke-width="1" opacity="0.8"/>
+  <!-- Mini candlesticks inside logo box -->
+  <g filter="url(#glowF)">
+    <line x1="75" y1="105" x2="75" y2="128" stroke="#ff4d6d" stroke-width="1.5" opacity="0.8"/>
+    <rect x="70" y="110" width="10" height="14" rx="1.5" fill="#ff4d6d" opacity="0.8"/>
+    <line x1="75" y1="124" x2="75" y2="140" stroke="#ff4d6d" stroke-width="1.5" opacity="0.8"/>
+
+    <line x1="93" y1="100" x2="93" y2="118" stroke="#00e5a0" stroke-width="1.5"/>
+    <rect x="88" y="105" width="10" height="18" rx="1.5" fill="url(#candleUp)"/>
+    <line x1="93" y1="123" x2="93" y2="138" stroke="#00e5a0" stroke-width="1.5"/>
+
+    <line x1="111" y1="96" x2="111" y2="112" stroke="#00e5a0" stroke-width="2"/>
+    <rect x="106" y="102" width="10" height="22" rx="1.5" fill="url(#candleUp)"/>
+    <line x1="111" y1="124" x2="111" y2="142" stroke="#00e5a0" stroke-width="2"/>
+
+    <line x1="129" y1="99" x2="129" y2="115" stroke="#ff4d6d" stroke-width="1.5" opacity="0.7"/>
+    <rect x="124" y="105" width="10" height="12" rx="1.5" fill="#ff4d6d" opacity="0.7"/>
+    <line x1="129" y1="117" x2="129" y2="136" stroke="#ff4d6d" stroke-width="1.5" opacity="0.7"/>
+  </g>
+  <!-- TP text inside box -->
+  <text x="102" y="170" text-anchor="middle" font-family="'Courier New', monospace" font-size="18" font-weight="700" fill="#00e5a0" filter="url(#glowF)" letter-spacing="3">TP</text>
+
+  <!-- Main title -->
+  <text
+    x="178"
+    y="162"
+    font-family="'Courier New', monospace"
+    font-size="72"
+    font-weight="700"
+    letter-spacing="-1"
+    fill="url(#titleGrad)"
+    filter="url(#textGlow)"
+  >TradePulse</text>
+
+  <!-- Subtitle -->
+  <text
+    x="178"
+    y="198"
+    font-family="'Courier New', monospace"
+    font-size="15"
+    letter-spacing="4"
+    fill="#00cfff"
+    opacity="0.75"
+  >FINANCIAL INTELLIGENCE FOR HOME ASSISTANT</text>
+
+  <!-- Tag pills -->
+  <!-- HACS pill -->
+  <rect x="178" y="214" width="76" height="22" rx="11" fill="#00e5a0" opacity="0.12" stroke="#00e5a0" stroke-width="0.8"/>
+  <text x="216" y="229" text-anchor="middle" font-family="'Courier New', monospace" font-size="10" letter-spacing="1.5" fill="#00e5a0">HACS</text>
+
+  <!-- Python pill -->
+  <rect x="264" y="214" width="82" height="22" rx="11" fill="#00cfff" opacity="0.10" stroke="#00cfff" stroke-width="0.8"/>
+  <text x="305" y="229" text-anchor="middle" font-family="'Courier New', monospace" font-size="10" letter-spacing="1.5" fill="#00cfff">PYTHON</text>
+
+  <!-- MIT pill -->
+  <rect x="356" y="214" width="60" height="22" rx="11" fill="#9b8fff" opacity="0.10" stroke="#9b8fff" stroke-width="0.8"/>
+  <text x="386" y="229" text-anchor="middle" font-family="'Courier New', monospace" font-size="10" letter-spacing="1.5" fill="#9b8fff">MIT</text>
+
+  <!-- Bottom separator line -->
+  <line x1="0" y1="318" x2="1280" y2="318" stroke="#00e5a0" stroke-width="1.5" opacity="0.3"/>
+
+  <!-- Corner accents -->
+  <rect x="0" y="0" width="6" height="32" fill="#00e5a0" opacity="0.5"/>
+  <rect x="0" y="0" width="32" height="6" fill="#00e5a0" opacity="0.5"/>
+  <rect x="1274" y="0" width="6" height="32" fill="#00e5a0" opacity="0.3"/>
+  <rect x="1248" y="0" width="32" height="6" fill="#00e5a0" opacity="0.3"/>
+</svg>
