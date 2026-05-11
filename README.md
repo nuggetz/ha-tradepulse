@@ -1,5 +1,7 @@
 # TradePulse
 
+![TradePulse](docs/imgs/tradepulse_readme_header.png)
+
 Track stocks, ETFs, forex, and crypto directly in Home Assistant — price, news, and insider trading as native sensor entities, ready for dashboards and automations.
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
