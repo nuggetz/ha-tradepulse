@@ -6,6 +6,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
@@ -15,6 +16,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
+from .api.insider import InsiderClient
 from .api.price import PriceClient
 from .const import (
     CONF_FINNHUB_API_KEY,
@@ -229,9 +231,6 @@ class TradePulseOptionsFlow(OptionsFlow):
             new_options = {**self._config_entry.options}
 
             if raw_key:
-                from .api.insider import InsiderClient
-                from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
                 session = async_get_clientsession(self.hass)
                 client = InsiderClient(session)
                 if not await client.validate_finnhub_key(raw_key):

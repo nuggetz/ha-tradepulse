@@ -8,6 +8,5 @@
   "requirements": ["yfinance>=0.2.40"],
   "dependencies": [],
   "codeowners": ["@nuggetz"],
-  "iot_class": "cloud_polling",
-  "homeassistant": "2024.2.0"
+  "iot_class": "cloud_polling"
 }

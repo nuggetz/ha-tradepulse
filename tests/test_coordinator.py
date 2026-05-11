@@ -45,14 +45,14 @@ def entry():
 
 @pytest.mark.asyncio
 async def test_price_coordinator_fetch_ok(hass, entry, mock_price_client):
-    mock_price_client.get_price.side_effect = lambda t: AsyncMock(
-        return_value=_make_price(t)
-    )()
+    async def _get_price(ticker):
+        return _make_price(ticker)
+
+    mock_price_client.get_price.side_effect = _get_price
     coord = PriceCoordinator(hass, entry, mock_price_client, ["TSLA", "AAPL"])
     coord.data = {}
 
-    with patch.object(coord, "_async_update_data", wraps=coord._async_update_data):
-        result = await coord._async_update_data()
+    result = await coord._async_update_data()
 
     assert "TSLA" in result
     assert "AAPL" in result
