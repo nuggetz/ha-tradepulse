@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { font-family: monospace; font-size: 13px; padding: 16px; background: #1e1e1e; color: #d4d4d4; }
+  pre { white-space: pre-wrap; word-break: break-word; }
+  button {
+    position: fixed; top: 12px; right: 12px;
+    background: #0e639c; color: white; border: none;
+    padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;
+  }
+  button:active { background: #1177bb; }
+</style>
+</head>
+<body>
+<button onclick="copy()">📋 Copia tutto</button>
+<pre id="content"># TradePulse — SPEC.md
+*Specifica architetturale per Claude Code — maggio 2026*
+
+---
+
+## 1. Panoramica
+
+TradePulse è un custom component Home Assistant (dominio: `tradepulse`) distribuito via HACS.
+Trasforma asset finanziari (azioni, ETF, forex, crypto) in entità HA native — prezzo, news
+aggregate, insider trading — pronte per dashboard e automazioni.
+
+**Stack**: Python 3.11+, aiohttp async, DataUpdateCoordinator, config flow UI.
+**Modello**: tutto funzionante senza API key; Finnhub key opzionale per feature EU/avanzate.
+**Distribuzione**: HACS, MIT license, repository `ha-tradepulse`.
+
+---
+
+## 2. Struttura file
+
+```
+custom_components/tradepulse/
+├── __init__.py               # setup/unload entry
+├── manifest.json             # HACS metadata, requirements
+├── const.py                  # costanti (DOMAIN, DEFAULT_*, CONF_*)
+├── config_flow.py            # ConfigFlow + OptionsFlow
+├── coordinator.py            # PriceCoordinator, NewsCoordinator, InsiderCoordinator
+├── sensor.py                 # entità sensori, async_setup_entry
+├── models.py                 # dataclass: PriceData, NewsData, InsiderData, ecc.
+├── strings.json              # UI strings
+├── translations/
+│   └── en.json
+├── api/
+│   ├── __init__.py
+│   ├── price.py              # PriceClient (yfinance wrapper async)
+│   ├── news.py               # NewsClient (Yahoo RSS + Google RSS + Finnhub merge)
+│   └── insider.py            # InsiderClient (EDGAR + securitiesdb + Finnhub)
+└── tests/
+    ├── conftest.py
+    ├── test_config_flow.py
+    ├── test_coordinator.py
+    ├── test_api_price.py
+    ├── test_api_news.py
+    └── test_api_insider.py
+```
+
+---
+
+## 3. Modelli dati (`models.py`)
+
+```python
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Optional
+
+@dataclass
+class NewsArticle:
+    title: str
+    url: str
+    source: str
+    published_at: datetime
+    summary: str = ""
+
+@dataclass
+class InsiderTransaction:
+    name: str
+    role: str
+    transaction_type: str          # "buy" | "sell"
+    shares: int
+    price_per_share: float
+    total_value: float
+    date: datetime
+
+@dataclass
+class PriceData:
+    ticker: str
+    price: float
+    currency: str
+    exchange: str
+    asset_type: str                # "stock" | "etf" | "forex" | "crypto"
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+    close: Optional[float] = None
+    volume: Optional[int] = None
+    change: Optional[float] = None
+    change_pct: Optional[float] = None
+    market_cap: Optional[float] = None
+    name: str = ""
+    stale: bool = False
+    last_updated: Optional[datetime] = None
+
+@dataclass
+class NewsData:
+    ticker: str
+    articles: list[NewsArticle] = field(default_factory=list)
+    stale: bool = False
+    last_updated: Optional[datetime] = None
+
+@dataclass
+class InsiderData:
+    ticker: str
+    transactions: list[InsiderTransaction] = field(default_factory=list)
+    buy_sell_ratio: float = 0.0
+    cluster_signal: bool = False   # True se >= 2 insider comprano entro 30 giorni
+    stale: bool = False
+    last_updated: Optional[datetime] = None
+```
+
+---
+
+## 4. Costanti (`const.py`)
+
+```python
+DOMAIN = "tradepulse"
+
+CONF_SYMBOLS           = "symbols"
+CONF_FINNHUB_API_KEY   = "finnhub_api_key"
+CONF_NEWS_COUNT        = "news_count"
+CONF_SCAN_INTERVAL     = "scan_interval"
+CONF_NEWS_INTERVAL     = "news_interval"
+CONF_LANGUAGE          = "language"
+
+DEFAULT_NEWS_COUNT        = 10
+DEFAULT_SCAN_INTERVAL     = 5      # minuti
+DEFAULT_NEWS_INTERVAL     = 30     # minuti
+DEFAULT_INSIDER_INTERVAL  = 6      # ore
+DEFAULT_LANGUAGE          = "en"
+
+ASSET_TYPE_STOCK  = "stock"
+ASSET_TYPE_ETF    = "etf"
+ASSET_TYPE_FOREX  = "forex"
+ASSET_TYPE_CRYPTO = "crypto"
+
+INSIDER_SUPPORTED_ASSET_TYPES = {ASSET_TYPE_STOCK}
+
+FINNHUB_FREE_RATE_LIMIT    = 60    # req/min
+COINGECKO_FREE_RATE_LIMIT  = 30    # req/min
+SEC_EDGAR_RATE_LIMIT       = 10    # req/sec
+
+SENSOR_TYPE_PRICE   = "price"
+SENSOR_TYPE_NEWS    = "news"
+SENSOR_TYPE_INSIDER = "insider"
+```
+
+---
+
+## 5. Config Flow (`config_flow.py`)
+
+### 5.1 Struttura
+
+```
+ConfigFlow (domain="tradepulse")
+├── async_step_user()        → form multi-simbolo
+└── (validazione inline async via PriceClient.validate_symbol)
+
+OptionsFlow
+├── async_step_init()        → menu: scegli sezione
+├── async_step_symbols()     → aggiungi / rimuovi simboli
+├── async_step_options()     → news_count, scan_interval, news_interval, language
+└── async_step_api_keys()    → finnhub_api_key (password field, validazione inline)
+```
+
+### 5.2 Step user
+
+- Campo `symbols`: stringa libera, input multiplo separato da virgola o newline
+  (es. `TSLA, AAPL, BTC-USD`)
+- Parsing: `strip()`, `upper()`, deduplicazione
+- Validazione async ogni simbolo: `PriceClient.validate_symbol(ticker)`, timeout 10s
+- Errore inline se uno o più simboli non trovati (lista dei simboli invalidi)
+- Auto-detect per ogni simbolo valido: `asset_type`, `exchange`, `currency`, `name`
+  → salvati in `config_entry.data[CONF_SYMBOLS]` come `dict[ticker, meta_dict]`
+- `unique_id` dell'entry: `"tradepulse_main"` (entry singola per tutta l'integrazione)
+
+### 5.3 OptionsFlow — simboli
+
+- Lista simboli correnti con selezione per rimozione
+- Campo per aggiungere nuovi simboli (stesso flusso validazione dello step user)
+- Trigger `async_reload_entry` dopo salvataggio
+
+### 5.4 OptionsFlow — opzioni avanzate
+
+```python
+vol.Schema({
+    vol.Optional(CONF_NEWS_COUNT, default=DEFAULT_NEWS_COUNT):
+        vol.All(vol.Coerce(int), vol.Range(min=5, max=50)),
+    vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL):
+        vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+    vol.Optional(CONF_NEWS_INTERVAL, default=DEFAULT_NEWS_INTERVAL):
+        vol.All(vol.Coerce(int), vol.Range(min=15, max=120)),
+    vol.Optional(CONF_LANGUAGE, default=DEFAULT_LANGUAGE): str,
+})
+```
+
+### 5.5 OptionsFlow — API keys
+
+- Campo `finnhub_api_key`: opzionale, password field (non mostrato in chiaro)
+- Se compilato: chiama `InsiderClient.validate_finnhub_key(key)` prima di salvare
+- Se chiave non valida: errore inline `errors["finnhub_api_key"] = "invalid_finnhub_key"`,
+  NON blocca il salvataggio delle altre opzioni dello stesso step
+
+---
+
+## 6. Coordinator (`coordinator.py`)
+
+### 6.1 Pattern: coordinator globale per tipo
+
+Un unico coordinator per tipo (price / news / insider) aggiorna **tutti i ticker** in un
+unico sweep. I dati sono strutturati come `dict[str, T]` (chiave = ticker originale).
+
+```python
+@dataclass
+class TradePulseRuntimeData:
+    price_coordinator:   PriceCoordinator
+    news_coordinator:    NewsCoordinator
+    insider_coordinator: InsiderCoordinator
+    price_client:   PriceClient
+    news_client:    NewsClient
+    insider_client: InsiderClient
+```
+
+### 6.2 PriceCoordinator
+
+```python
+class PriceCoordinator(DataUpdateCoordinator[dict[str, PriceData]]):
+    """update_interval = scan_interval (default 5 min)."""
+
+    async def _async_update_data(self) -> dict[str, PriceData]:
+        results: dict[str, PriceData] = {}
+        for ticker in self._tickers:
+            try:
+                data = await self._client.get_price(ticker)
+                self._cache[ticker] = data
+                results[ticker] = data
+            except Exception as exc:
+                _LOGGER.warning("Price fetch failed for %s: %s", ticker, exc)
+                if ticker in self._cache:
+                    results[ticker] = replace(self._cache[ticker], stale=True)
+        return results
+```
+
+### 6.3 NewsCoordinator
+
+Stesso pattern, `update_interval = news_interval`, tipo `dict[str, NewsData]`.
+
+### 6.4 InsiderCoordinator
+
+Stesso pattern, `update_interval = timedelta(hours=DEFAULT_INSIDER_INTERVAL)`,
+tipo `dict[str, InsiderData]`.
+Salta silenziosamente (log DEBUG) i ticker il cui `asset_type` non è in
+`INSIDER_SUPPORTED_ASSET_TYPES`.
+
+---
+
+## 7. Layer API (`api/`)
+
+### 7.1 PriceClient (`api/price.py`)
+
+```python
+class PriceClient:
+    """yfinance è sincrono: usare asyncio.to_thread per ogni chiamata. Timeout 15s."""
+
+    async def get_price(self, ticker: str) -> PriceData: ...
+
+    async def validate_symbol(self, ticker: str) -> dict:
+        """Ritorna {asset_type, exchange, currency, name}.
+        Lancia ValueError se il simbolo non restituisce dati."""
+
+    async def _fetch_yfinance(self, ticker: str) -> dict:
+        """Wrapper asyncio.to_thread attorno a yf.Ticker(ticker).info"""
+```
+
+**Asset type detection** da `info["quoteType"]`:
+
+| quoteType | asset_type |
+|---|---|
+| `"EQUITY"` | `"stock"` |
+| `"ETF"` | `"etf"` |
+| `"CURRENCY"` | `"forex"` |
+| `"CRYPTOCURRENCY"` | `"crypto"` |
+
+### 7.2 NewsClient (`api/news.py`)
+
+```python
+class NewsClient:
+    def __init__(self, session: aiohttp.ClientSession, finnhub_key: str | None = None): ...
+
+    async def get_news(self, ticker: str, language: str, count: int) -> NewsData:
+        """asyncio.gather su tutte le fonti, merge, dedup, sort desc, truncate a count."""
+
+    async def _fetch_yahoo_rss(self, ticker: str) -> list[NewsArticle]: ...
+    async def _fetch_google_rss(self, ticker: str, language: str) -> list[NewsArticle]: ...
+    async def _fetch_finnhub(self, ticker: str) -> list[NewsArticle]: ...  # solo se key
+
+    def _merge_and_deduplicate(
+        self, sources: list[list[NewsArticle]]
+    ) -> list[NewsArticle]:
+        """Dedup per URL normalizzato (lowercase, strip UTM/query params tracking).
+        Sort per published_at descrescente."""
+```
+
+**URL Yahoo RSS**:
+`https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}`
+
+**URL Google RSS**:
+`https://news.google.com/rss/search?q={ticker}+stock&hl={lang}-{LANG}&gl={LANG}&ceid={LANG}:{lang}`
+
+**Parsing XML**: `xml.etree.ElementTree` (stdlib, zero dipendenze aggiuntive).
+
+Se una fonte fallisce: log WARNING, la fonte viene ignorata, le altre continuano.
+Se tutte le fonti falliscono: log ERROR, ritorna cached `NewsData` con `stale=True`.
+
+### 7.3 InsiderClient (`api/insider.py`)
+
+```python
+class InsiderClient:
+    def __init__(self, session: aiohttp.ClientSession, finnhub_key: str | None = None): ...
+
+    async def get_insider(self, ticker: str, asset_type: str) -> InsiderData:
+        """Ritorna InsiderData con lista vuota (NON None) se asset_type non supportato.
+        Questo garantisce che l'entità esista sempre con state=0."""
+
+    async def _fetch_securitiesdb(self, ticker: str) -> InsiderData: ...
+    async def _fetch_sec_edgar(self, ticker: str) -> list[InsiderTransaction]: ...
+    async def _fetch_finnhub_insider(self, ticker: str) -> list[InsiderTransaction]: ...
+
+    async def validate_finnhub_key(self, key: str) -> bool:
+        """GET /api/v1/stock/profile2?symbol=AAPL con la key. True se 200, False altrimenti."""
+
+    def _compute_cluster_signal(self, transactions: list[InsiderTransaction]) -> bool:
+        """True se >= 2 transazioni BUY da insider DISTINTI negli ultimi 30 giorni."""
+
+    def _compute_buy_sell_ratio(
+        self, transactions: list[InsiderTransaction], days: int = 90
+    ) -> float:
+        """shares_buy / max(shares_sell, 1) sugli ultimi `days` giorni."""
+```
+
+**Logica source selection**:
+1. `securitiesdb` come fonte primaria US (no key, buy/sell ratio precompilato)
+2. Merge con `SEC EDGAR` per completezza (Form 4, ultimi 90 giorni)
+3. Se Finnhub key presente → integra con EU/UK PDMR data
+4. Se ticker EU + no Finnhub key → log DEBUG, ritorna `InsiderData(ticker=ticker, transactions=[])`
+
+---
+
+## 8. Sensori (`sensor.py`)
+
+### 8.1 Setup
+
+```python
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    runtime: TradePulseRuntimeData = entry.runtime_data
+    entities: list[SensorEntity] = []
+
+    for ticker, meta in entry.data[CONF_SYMBOLS].items():
+        entities.append(
+            TradePulsePriceSensor(ticker, meta, runtime.price_coordinator)
+        )
+        entities.append(
+            TradePulseNewsSensor(ticker, meta, runtime.news_coordinator)
+        )
+        if meta["asset_type"] in INSIDER_SUPPORTED_ASSET_TYPES:
+            entities.append(
+                TradePulseInsiderSensor(ticker, meta, runtime.insider_coordinator)
+            )
+
+    async_add_entities(entities)
+```
+
+### 8.2 TradePulsePriceSensor
+
+```python
+class TradePulsePriceSensor(CoordinatorEntity[PriceCoordinator], SensorEntity):
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.MONETARY
+
+    @property
+    def unique_id(self) -> str:
+        return f"tradepulse_{normalize_ticker(self._ticker)}_price"
+
+    @property
+    def name(self) -> str:
+        return f"{self._meta['name']} Price"
+
+    @property
+    def native_value(self) -> float | None:
+        data = self.coordinator.data.get(self._ticker)
+        return data.price if data else None
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        data = self.coordinator.data.get(self._ticker)
+        return data.currency if data else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data.get(self._ticker)
+        if not data:
+            return {}
+        return {
+            "open": data.open, "high": data.high, "low": data.low,
+            "close": data.close, "volume": data.volume,
+            "change": data.change, "change_pct": data.change_pct,
+            "market_cap": data.market_cap, "currency": data.currency,
+            "exchange": data.exchange, "asset_type": data.asset_type,
+            "stale": data.stale,
+            "last_updated": data.last_updated.isoformat() if data.last_updated else None,
+        }
+```
+
+### 8.3 TradePulseNewsSensor
+
+- `native_value` → `int` — `len(data.articles)`
+- `extra_state_attributes`:
+  ```python
+  {
+      "articles": [dataclasses.asdict(a) for a in data.articles],
+      "stale": data.stale,
+      "last_updated": data.last_updated.isoformat() if data.last_updated else None,
+  }
+  ```
+
+### 8.4 TradePulseInsiderSensor
+
+- `native_value` → `int` — numero transazioni ultimi 90 giorni
+- `extra_state_attributes`:
+  ```python
+  {
+      "transactions": [dataclasses.asdict(t) for t in data.transactions],
+      "buy_sell_ratio": data.buy_sell_ratio,
+      "cluster_signal": data.cluster_signal,
+      "stale": data.stale,
+      "last_updated": data.last_updated.isoformat() if data.last_updated else None,
+  }
+  ```
+
+### 8.5 Normalizzazione ticker ID
+
+```python
+def normalize_ticker(ticker: str) -> str:
+    """TSLA→tsla  BTC-USD→btc_usd  VWCE.DE→vwce_de  EURUSD=X→eurusd_x"""
+    return ticker.lower().replace("-", "_").replace(".", "_").replace("=", "_")
+```
+
+---
+
+## 9. `__init__.py`
+
+```python
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    session       = async_get_clientsession(hass)
+    finnhub_key   = entry.data.get(CONF_FINNHUB_API_KEY)
+    tickers       = list(entry.data[CONF_SYMBOLS].keys())
+
+    price_client   = PriceClient()
+    news_client    = NewsClient(session, finnhub_key)
+    insider_client = InsiderClient(session, finnhub_key)
+
+    price_coordinator   = PriceCoordinator(hass, entry, price_client, tickers)
+    news_coordinator    = NewsCoordinator(hass, entry, news_client, tickers)
+    insider_coordinator = InsiderCoordinator(hass, entry, insider_client, tickers)
+
+    # Price: blocca setup → ConfigEntryNotReady se fallisce (HA riprova automaticamente)
+    await price_coordinator.async_config_entry_first_refresh()
+    # News e insider: non bloccanti, stale=True finché non completano
+    await news_coordinator.async_refresh()
+    await insider_coordinator.async_refresh()
+
+    entry.runtime_data = TradePulseRuntimeData(
+        price_coordinator=price_coordinator,
+        news_coordinator=news_coordinator,
+        insider_coordinator=insider_coordinator,
+        price_client=price_client,
+        news_client=news_client,
+        insider_client=insider_client,
+    )
+
+    await hass.config_entries.async_forward_entry_setups(entry, [Platform.SENSOR])
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+    return True
+
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    return await hass.config_entries.async_unload_platforms(entry, [Platform.SENSOR])
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    await hass.config_entries.async_reload(entry.entry_id)
+```
+
+---
+
+## 10. `manifest.json`
+
+```json
+{
+  "domain": "tradepulse",
+  "name": "TradePulse",
+  "version": "0.1.0",
+  "config_flow": true,
+  "documentation": "https://github.com/YOURUSERNAME/ha-tradepulse",
+  "issue_tracker": "https://github.com/YOURUSERNAME/ha-tradepulse/issues",
+  "requirements": ["yfinance>=0.2.40"],
+  "dependencies": [],
+  "codeowners": ["@YOURUSERNAME"],
+  "iot_class": "cloud_polling",
+  "homeassistant": "2024.1.0"
+}
+```
+
+---
+
+## 11. Sicurezza
+
+- **API key**: salvata in `config_entry.data` (HA encrypted storage). Nei log usare
+  `"[REDACTED]"`, mai il valore reale, a nessun livello di logging.
+- **Input sanitization**: tutti i simboli vengono `strip()` + `upper()` + validati via
+  yfinance prima di essere salvati nell'entry.
+- **Rate limiting Finnhub**: il client mantiene un contatore interno; se si avvicina
+  al limite (60 req/min) introduce `asyncio.sleep` per rispettarlo.
+- **No requests sincroni**: zero import di `requests`. Solo `aiohttp` async e
+  `asyncio.to_thread` per yfinance.
+- **Timeout HTTP**: tutte le chiamate `aiohttp` usano `ClientTimeout(total=15)`.
+
+---
+
+## 12. Graceful degradation
+
+| Scenario | Comportamento |
+|---|---|
+| yfinance down al first refresh | `ConfigEntryNotReady` → HA riprova automaticamente |
+| yfinance down su update successivo | Log WARNING, `PriceData` cached con `stale=True` |
+| Yahoo RSS irraggiungibile | Log WARNING, usa solo Google RSS (+ Finnhub se key) |
+| Google RSS irraggiungibile | Log WARNING, usa solo Yahoo RSS |
+| Tutte le news source down | Log ERROR, `NewsData` cached con `stale=True` |
+| securitiesdb down | Log WARNING, fallback diretto a SEC EDGAR |
+| EDGAR down | Log WARNING, `InsiderData` cached con `stale=True` |
+| Ticker EU senza Finnhub key | Log DEBUG, `InsiderData(transactions=[])` — state=0 |
+| Finnhub key non valida nel flow | Errore inline, key NON salvata |
+| Simbolo non trovato nel flow | Errore user-friendly, simbolo NON aggiunto |
+
+---
+
+## 13. Test
+
+### conftest.py
+Fixtures: `mock_hass`, `mock_config_entry`, `mock_price_client`, `mock_news_client`,
+`mock_insider_client`, `mock_aiohttp_session` (via `aioresponses`)
+
+### test_config_flow.py
+- Step user: simbolo singolo valido, invalido, lista mista (un invalido su tre)
+- OptionsFlow: modifica `news_count`, aggiunta ticker, rimozione ticker
+- API key: valida, non valida (non blocca salvataggio delle altre opzioni)
+
+### test_coordinator.py
+- PriceCoordinator: fetch OK, provider down (stale), un ticker su tre fallisce
+- NewsCoordinator: merge 3 fonti, deduplicazione cross-source, ordinamento per data
+- InsiderCoordinator: skip forex, skip crypto, stale su fallback EDGAR
+
+### test_api_price.py
+- `validate_symbol`: valido, invalido, timeout
+- `get_price`: dati completi, campi opzionali None
+- `asset_type` detection: stock, etf, forex, crypto
+
+### test_api_news.py
+- `_fetch_yahoo_rss`: XML valido, feed vuoto, errore HTTP 503
+- `_merge_and_deduplicate`: URL duplicati da fonti diverse, ordinamento per data
+- `get_news`: una fonte fallisce, tutte le fonti falliscono
+
+### test_api_insider.py
+- `_compute_cluster_signal`: True (2 buy da insider distinti, 30gg), False (edge cases)
+- `_compute_buy_sell_ratio`: calcolo corretto, lista vuota → 0.0
+- `get_insider`: forex → `InsiderData` vuota, EU no-key → `InsiderData` vuota + log DEBUG
+
+---
+
+## 14. Entità — naming
+
+| Ticker input | Entity ID | Nome visualizzato |
+|---|---|---|
+| `TSLA` | `sensor.tradepulse_tsla_price` | Tesla Inc. Price |
+| `TSLA` | `sensor.tradepulse_tsla_news` | Tesla Inc. News |
+| `TSLA` | `sensor.tradepulse_tsla_insider` | Tesla Inc. Insider |
+| `BTC-USD` | `sensor.tradepulse_btc_usd_price` | Bitcoin Price |
+| `BTC-USD` | `sensor.tradepulse_btc_usd_news` | Bitcoin News |
+| `EURUSD=X` | `sensor.tradepulse_eurusd_x_price` | EUR/USD Price |
+| `EURUSD=X` | `sensor.tradepulse_eurusd_x_news` | EUR/USD News |
+| `VWCE.DE` | `sensor.tradepulse_vwce_de_price` | Vanguard FTSE All-World Price |
+
+---
+
+## 15. Decisioni architetturali
+
+| Decisione | Rationale |
+|---|---|
+| Entry singola per tutti i ticker | Semplifica unload/reload; unico OptionsFlow per gestire la lista |
+| Coordinator globale per tipo | Un sweep → meno overhead scheduler; pattern raccomandato HA |
+| No SQLite / persistenza news | Non richiesto dalla community HA; complessità non necessaria in V1 |
+| `stale` flag invece di exception | Entità sempre presente; automazioni non si rompono su outage provider |
+| `asyncio.to_thread` per yfinance | yfinance è sync-only; wrapping evita blocco event loop HA |
+| `config_entry.data` per API key | HA gestisce encryption at rest; mai plaintext nei log |
+| Insider EU vuoto senza key (vs assente) | UX migliore: l'utente vede l'entità e capisce che serve Finnhub key |
+| `async_config_entry_first_refresh` solo su price | News/insider non bloccanti: se solo RSS è down, il componente si carica ugualmente |
+</pre>
+<script>
+function copy() {
+  const text = document.getElementById('content').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('button');
+    btn.textContent = '✅ Copiato!';
+    setTimeout(() => btn.textContent = '📋 Copia tutto', 2000);
+  });
+}
+</script>
+</body>
+</html>

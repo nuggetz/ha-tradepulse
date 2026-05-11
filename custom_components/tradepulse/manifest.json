@@ -1,0 +1,13 @@
+{
+  "domain": "tradepulse",
+  "name": "TradePulse",
+  "version": "0.1.0",
+  "config_flow": true,
+  "documentation": "https://github.com/YOURUSERNAME/ha-tradepulse",
+  "issue_tracker": "https://github.com/YOURUSERNAME/ha-tradepulse/issues",
+  "requirements": ["yfinance>=0.2.40"],
+  "dependencies": [],
+  "codeowners": ["@YOURUSERNAME"],
+  "iot_class": "cloud_polling",
+  "homeassistant": "2024.2.0"
+}

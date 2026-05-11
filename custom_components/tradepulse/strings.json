@@ -1,0 +1,66 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add financial assets",
+        "description": "Enter the ticker symbols to track (e.g. TSLA, AAPL, BTC-USD, EURUSD=X, VWCE.DE). Separate multiple symbols with commas or newlines.",
+        "data": {
+          "symbols": "Ticker symbols"
+        },
+        "data_description": {
+          "symbols": "Comma or newline-separated list of ticker symbols"
+        }
+      }
+    },
+    "error": {
+      "no_symbols": "Please enter at least one symbol.",
+      "invalid_symbols": "The following symbols were not found: {invalid_list}",
+      "cannot_connect": "Cannot connect to data provider. Please try again.",
+      "unknown": "Unexpected error. Check the logs for details."
+    },
+    "abort": {
+      "already_configured": "TradePulse is already configured. Use the Options menu to manage symbols."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "TradePulse Settings"
+      },
+      "symbols": {
+        "title": "Manage symbols",
+        "description": "Add or remove tracked ticker symbols.",
+        "data": {
+          "add_symbols": "Add symbols",
+          "remove_symbols": "Remove symbols"
+        },
+        "data_description": {
+          "add_symbols": "Comma-separated list of new symbols to add",
+          "remove_symbols": "Select symbols to remove from tracking"
+        }
+      },
+      "options": {
+        "title": "Advanced options",
+        "data": {
+          "news_count": "Max articles per ticker",
+          "scan_interval": "Price update interval (minutes)",
+          "news_interval": "News update interval (minutes)",
+          "language": "News language"
+        }
+      },
+      "api_keys": {
+        "title": "API keys",
+        "description": "The Finnhub API key is optional. Without it, EU/UK insider (PDMR) data is unavailable. Get a free key at finnhub.io.",
+        "data": {
+          "finnhub_api_key": "Finnhub API key"
+        }
+      }
+    },
+    "error": {
+      "no_symbols": "Please enter at least one symbol.",
+      "invalid_symbols": "The following symbols were not found: {invalid_list}",
+      "invalid_finnhub_key": "Invalid Finnhub API key. The key was not saved.",
+      "cannot_connect": "Cannot connect to data provider. Please try again."
+    }
+  }
+}
